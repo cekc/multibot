@@ -2,57 +2,79 @@ package multibot
 
 import (
 	"context"
-	"sync"
+	"errors"
 
-	"github.com/cekc/multibot/internal/signal"
+	"github.com/cekc/multibot/worker"
 )
 
 type Multibot struct {
-	fetchers []Fetcher
-	handlers []Handler
+	WorkerPool WorkerPool
+
+	fetchers            []Fetcher
+	handlers            []Handler
+	cancelProcessingCtx context.CancelFunc
+	ranOutOfUpdates     chan struct{}
 }
 
 func New() *Multibot {
-	var multibot Multibot
-
-	return &multibot
+	return &Multibot{
+		WorkerPool: worker.NewPool(),
+	}
 }
 
-func (multibot *Multibot) RegisterFetchers(fetchers ...Fetcher) {
-	multibot.fetchers = append(multibot.fetchers, fetchers...)
+func (multibot *Multibot) AddFetcher(fetcher Fetcher) {
+	multibot.fetchers = append(multibot.fetchers, fetcher)
 }
 
-func (multibot *Multibot) RegisterHandlers(handlers ...Handler) {
-	multibot.handlers = append(multibot.handlers, handlers...)
+func (multibot *Multibot) AddHandler(handler Handler) {
+	multibot.handlers = append(multibot.handlers, handler)
 }
 
-func (multibot *Multibot) Fetch(ctx context.Context) <-chan Update {
+func (multibot *Multibot) fetch(ctx context.Context) <-chan Update {
 	var channels []<-chan Update
 	for _, fetcher := range multibot.fetchers {
 		channels = append(channels, fetcher.Fetch(ctx))
 	}
 
-	return merge(ctx, channels...)
+	return merge(channels...)
 }
 
-func (multibot *Multibot) Serve() {
-	multibot.ServeInContext(context.Background())
-}
+func (multibot *Multibot) Process() {
+	multibot.ranOutOfUpdates = make(chan struct{})
 
-func (multibot *Multibot) ServeInContext(ctx context.Context) {
-	ctx = signal.ListenQuit(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	multibot.cancelProcessingCtx = cancel
 
-	var wg sync.WaitGroup
-	for update := range multibot.Fetch(ctx) {
+	for update := range multibot.fetch(ctx) {
 		for _, handler := range multibot.handlers {
-			wg.Add(1)
-
-			go func(handler Handler) {
-				defer wg.Done()
+			handler, update := handler, update
+			multibot.WorkerPool.Submit(func() {
 				handler.Handle(ctx, update)
-			}(handler)
+			})
 		}
 	}
 
-	wg.Wait()
+	close(multibot.ranOutOfUpdates)
+}
+
+func (multibot *Multibot) RanOutOfUpdates() <-chan struct{} {
+	return multibot.ranOutOfUpdates
+}
+
+func (multibot *Multibot) Shutdown(ctx context.Context) error {
+	multibot.cancelProcessingCtx()
+
+	workersDone := make(chan struct{})
+	go func() {
+		defer close(workersDone)
+		multibot.WorkerPool.Wait()
+	}()
+
+	select {
+	case <-ctx.Done():
+		return errors.New("Multibot shutdown: context expired")
+	case <-workersDone:
+	}
+
+	return nil
 }

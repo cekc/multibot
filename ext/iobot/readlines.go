@@ -1,4 +1,4 @@
-package filebot
+package iobot
 
 import (
 	"bufio"

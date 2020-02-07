@@ -1,4 +1,4 @@
-package filebot
+package iobot
 
 import (
 	"context"
@@ -9,15 +9,16 @@ import (
 )
 
 type Fetcher struct {
-	reader io.Reader
+	reader   io.Reader
+	notifier *Notifier
 }
 
-func NewFetcher(reader io.Reader) *Fetcher {
-	return &Fetcher{reader}
+func NewFetcher(reader io.Reader, writer io.Writer) *Fetcher {
+	return &Fetcher{reader, NewNotifier(writer)}
 }
 
 func NewConsoleFetcher() *Fetcher {
-	return NewFetcher(os.Stdin)
+	return NewFetcher(os.Stdin, os.Stdout)
 }
 
 func (fetcher *Fetcher) Fetch(ctx context.Context) <-chan multibot.Update {
@@ -36,9 +37,9 @@ func (fetcher *Fetcher) Fetch(ctx context.Context) <-chan multibot.Update {
 				if !ok {
 					return
 				}
-				updates <- multibot.Update{
-					Body: line,
-					From: "mysterious old man",
+				updates <- Update{
+					Text:     line,
+					Notifier: fetcher.notifier,
 				}
 			}
 		}

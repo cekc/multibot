@@ -1,6 +1,6 @@
 package multibot
 
-type Update struct {
-	Body string
-	From User
+type Update interface {
+	Body() string
+	Hook() Notifier
 }
