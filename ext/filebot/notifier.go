@@ -4,31 +4,25 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"sync"
 )
 
 type Notifier struct {
 	writer bufio.Writer
-	lock   chan struct{}
+	mut    sync.Mutex
 }
 
 func CreateNotifier(writer io.Writer) Notifier {
 	return Notifier{
 		writer: *bufio.NewWriter(writer),
-		lock:   make(chan struct{}, 1),
 	}
 }
 
 func (notifier *Notifier) Notify(ctx context.Context, message string) {
-	// TODO: use sync.Cond for performance
-	select {
-	case <-ctx.Done():
-		return
-	case notifier.lock <- struct{}{}:
-	}
+	defer notifier.mut.Unlock()
+	notifier.mut.Lock()
 
 	notifier.writer.WriteString(message)
 	notifier.writer.WriteRune('\n')
 	notifier.writer.Flush()
-
-	<-notifier.lock
 }

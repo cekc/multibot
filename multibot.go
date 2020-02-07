@@ -32,7 +32,7 @@ func (multibot *Multibot) Fetch(ctx context.Context) <-chan Update {
 		channels = append(channels, fetcher.Fetch(ctx))
 	}
 
-	return merge(ctx, channels...)
+	return merge(channels...)
 }
 
 func (multibot *Multibot) Serve() {
