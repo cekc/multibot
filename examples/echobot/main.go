@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cekc/multibot"
 	"github.com/cekc/multibot/ext/filebot"
@@ -13,7 +14,8 @@ type echoer struct {
 }
 
 func (e echoer) Handle(ctx context.Context, update multibot.Update) {
-	fmt.Println(update.From, e.name, "says:", update.Body)
+	message := strings.Join([]string{e.name, "says:", update.Body}, " ")
+	update.From.Notify(ctx, message)
 }
 
 func main() {
