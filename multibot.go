@@ -3,8 +3,6 @@ package multibot
 import (
 	"context"
 	"sync"
-
-	"github.com/cekc/multibot/internal/signal"
 )
 
 type Multibot struct {
@@ -18,15 +16,15 @@ func New() *Multibot {
 	return &multibot
 }
 
-func (multibot *Multibot) RegisterFetchers(fetchers ...Fetcher) {
-	multibot.fetchers = append(multibot.fetchers, fetchers...)
+func (multibot *Multibot) AddFetcher(fetcher Fetcher) {
+	multibot.fetchers = append(multibot.fetchers, fetcher)
 }
 
-func (multibot *Multibot) RegisterHandlers(handlers ...Handler) {
-	multibot.handlers = append(multibot.handlers, handlers...)
+func (multibot *Multibot) AddHandler(handler Handler) {
+	multibot.handlers = append(multibot.handlers, handler)
 }
 
-func (multibot *Multibot) Fetch(ctx context.Context) <-chan Update {
+func (multibot *Multibot) fetch(ctx context.Context) <-chan Update {
 	var channels []<-chan Update
 	for _, fetcher := range multibot.fetchers {
 		channels = append(channels, fetcher.Fetch(ctx))
@@ -35,15 +33,9 @@ func (multibot *Multibot) Fetch(ctx context.Context) <-chan Update {
 	return merge(channels...)
 }
 
-func (multibot *Multibot) Serve() {
-	multibot.ServeInContext(context.Background())
-}
-
-func (multibot *Multibot) ServeInContext(ctx context.Context) {
-	ctx = signal.ListenQuit(ctx)
-
+func (multibot *Multibot) Process(ctx context.Context) {
 	var wg sync.WaitGroup
-	for update := range multibot.Fetch(ctx) {
+	for update := range multibot.fetch(ctx) {
 		for _, handler := range multibot.handlers {
 			wg.Add(1)
 

@@ -1,27 +1,27 @@
-package signal
+package graceful
 
 import (
 	"context"
 	"os"
-	ossignal "os/signal"
+	"os/signal"
 	"syscall"
 )
 
-var defaultQuitSignals = []os.Signal{os.Interrupt, syscall.SIGQUIT, syscall.SIGTERM}
+var DefaultQuitSignals = []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT}
 
-func ListenQuit(parent context.Context) context.Context {
-	return Listen(parent, defaultQuitSignals...)
+func Context() context.Context {
+	return Listen(context.Background(), DefaultQuitSignals...)
 }
 
 func Listen(parent context.Context, signals ...os.Signal) context.Context {
 	ch := make(chan os.Signal, 1)
-	ossignal.Notify(ch, signals...)
+	signal.Notify(ch, signals...)
 
 	ctx, cancel := context.WithCancel(parent)
 
 	go func() {
 		defer cancel()
-		defer ossignal.Stop(ch)
+		defer signal.Stop(ch)
 
 		select {
 		case <-parent.Done():
