@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"time"
 
 	"github.com/cekc/multibot"
 	"github.com/cekc/multibot/adapter"
 	"github.com/cekc/multibot/ext/iobot"
+	"github.com/cekc/multibot/ext/telegram"
 	"github.com/cekc/multibot/shutdown"
 )
 
@@ -16,6 +19,12 @@ func main() {
 
 	echoer1 := adapter.Replier{func(message string) string { return fmt.Sprint("Mike says: ", message) }}
 	echoer2 := adapter.Replier{func(message string) string { return fmt.Sprint("Zu utters: ", message) }}
+
+	tg := telegram.NewFetcher().WithDebug(true)
+	err := tg.LongPoll(os.Getenv("TELEGRAM_BOT_TOKEN"), 0, time.Minute)
+	if err == nil {
+		bot.AddFetcher(tg)
+	}
 
 	bot.AddFetcher(iobot.NewConsoleFetcher())
 	bot.AddHandler(echoer1)
@@ -30,7 +39,7 @@ func main() {
 		log.Println("No more updates, shutting down...")
 	}
 
-	err := bot.Shutdown(context.Background())
+	err = bot.Shutdown(context.Background())
 
 	if err == nil {
 		log.Println("Gracefully shut down")

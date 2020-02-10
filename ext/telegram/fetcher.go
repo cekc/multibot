@@ -52,6 +52,11 @@ func (fetcher *Fetcher) LongPoll(token string, offset int, timeout time.Duration
 		return errors.WithMessage(err, "Could not connect to Telegam bot API")
 	}
 
+	_, err = bot.RemoveWebhook()
+	if err != nil {
+		return errors.WithMessage(err, "Could not remove webhook for Telegram bot")
+	}
+
 	updateConfig := tgbotapi.NewUpdate(offset)
 	updateConfig.Timeout = int(timeout.Seconds() + 0.5)
 
